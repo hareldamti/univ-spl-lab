@@ -52,19 +52,29 @@ int main(int argc, char **argv)
     int iarray[3];
     float farray[3];
     double darray[3];
-    char carray[3]; 
+    char carray[3];
+    printf("iarray: %p, iarray+1: %p\t sizeof(int): %d\n", iarray, iarray+1, sizeof(int));
+    printf("farray: %p, farray+1: %p\t sizeof(float): %d\n", farray, farray+1, sizeof(float));
+    printf("darray: %p, darray+1: %p\t sizeof(double): %d\n", darray, darray+1, sizeof(double));
+    printf("carray: %p, carray+1: %p\t sizeof(char): %d\n", carray, carray+1, sizeof(char));
+    
+    
     /* task 1 b here */
     
-    printf("Pointers and arrays (T1d): ");
+    printf("Pointers and arrays (T1d): \n");
     int iarray2[] = {1,2,3};
     char carray2[] = {'a','b','c'};
     int* iarray2Ptr;
     char* carray2Ptr; 
     /* task 1 d here */
-    
+    iarray2Ptr = iarray2;
+    carray2Ptr = carray2;
+    printf("iarray2: [%d, %d, %d]\n", *iarray2, *(iarray2+1), *(iarray2+2));
+    printf("carray2: [%c, %c, %c]\n", *carray2, *(carray2+1), *(carray2+2));
     printf("Command line arg addresses (T1e):\n");
     /* task 1 e here */
-    
+    for (int i = 1; i < argc; i++) 
+        printf("\taddr: %p\tvalue: %s\n", argv[i], argv[i]);
     return 0;
 }
 
@@ -76,15 +86,20 @@ void point_at(void *p)
 
     long dist1 = (size_t)&addr6 - (size_t)p;
     long dist2 = (size_t)&local - (size_t)p;
+    unsigned long dist2u = (size_t)&local - (size_t)p;
     long dist3 = (size_t)&foo - (size_t)p;
 
-    printf("- dist1: (size_t)&addr6 - (size_t)p: %ld\n", dist1);
-    printf("- dist2: (size_t)&local - (size_t)p: %ld\n", dist2);
-    printf("- dist3: (size_t)&foo - (size_t)p:  %ld\n", dist3);
+    printf("- dist1: (size_t)&addr6 - (size_t)p: %ld\t\t\t\t addresses: %p - %p\n", dist1, &addr6, p);
+    printf("- dist2: (size_t)&local - (size_t)p: %ld\t\t addresses: %p - %p\n", dist2, &local, p);
+    printf("- dist2 (unsigned): (size_t)&local - (size_t)p: %lu\t addresses: %p - %p\n", dist2u, &local, p);
+    printf("- dist3: (size_t)&foo - (size_t)p:  %ld\t\t\t addresses: %p - %p\n", dist3, &foo, p);
     
     printf("Check long type mem size (T1a):\n");
     /* part of task 1 a here */
-
+    printf("size of int: %d\n", sizeof(int));
+    printf("size of long: %d\n", sizeof(long));
+    printf("size of long long: %d\n", sizeof(long long));
+    // long size was not enough for dist. Unsigned long works
     printf("- addr0: %p\n", &addr0);
     printf("- addr1: %p\n", &addr1);
 }

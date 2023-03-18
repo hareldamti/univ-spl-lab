@@ -1,5 +1,3 @@
-/* $Id: count-words.c 858 2010-02-21 10:26:22Z tolpin $ */
-
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
@@ -7,11 +5,13 @@
 /* return string "word" if the count is 1 or "words" otherwise */
 char *words(int count)
 {
+  /*
   char *words = "words";
   if (count == 1)
-    	words[strlen(words)-1] = '\0';
-  
+    	words[strlen(words)-1] = '\0'; // Error: modifying a string literal
   return words;
+  */
+ return (count == 1) ? "word" : "words";
 }
 
 /* print a message reportint the number of words */
