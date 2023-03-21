@@ -1,17 +1,57 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <malloc.h>
 
-#include "base_functions.c"
+char* map(char *array, int array_length, char (*f) (char)){
+  char* mapped_array = (char*)(malloc(array_length * sizeof(char)));
+  for (int i = 0; i < array_length; i++) 
+    mapped_array[i] = (*f)(array[i]);
+  return mapped_array;
+}
 
-int MAX_INPUT_LENGTH = 20,
-    CARRAY_SIZE = 5;
+/* Ignores c, reads and returns a character from stdin using fgetc. */
+char my_get(char c){
+  return fgetc(stdin);
+}
 
-struct fun_desc {
+/* If c is a number between 0x20 and 0x7E, cprt prints the character
+   of ASCII value c followedby a new line. Otherwise, cprt prints the
+   dot ('.') character. After printing, cprt returns the value of c unchanged. */
+char cprt(char c){
+  if (0x20 <= c && c <= 0x7E) printf("%c\n", c);
+  else printf(".");
+  return c;
+}
+
+/* Gets a char c and returns its encrypted form by adding 2 to its value.
+   If c is not between 0x20 and 0x7E it is returned unchanged */
+char encrypt(char c) {
+  if (0x20 <= c && c <= 0x7E) return c + 2;
+  return c;
+}
+
+/* Gets a char c and returns its decrypted form by reducing 2 from its value.
+   If c is not between 0x20 and 0x7E it is returned unchanged */
+char decrypt(char c) {
+  if (0x20 <= c && c <= 0x7E) return c - 2;
+  return c;
+}
+
+/* xprt prints the value of c in a hexadecimal representation
+followed by a new line,and returns c unchanged. */
+char xprt(char c) {
+  printf("%x\n", c);
+  return c;
+}
+
+int MAX_INPUT_LENGTH = 20, CARRAY_SIZE = 5;
+
+typedef struct fun_desc {
     char *name;
     char (*fun)(char);
-};
+} fun_desc;
 
-struct fun_desc menu[] = {
+fun_desc menu[] = {
     { "my_get", &my_get },
     { "cprt", &cprt },
     { "encrypt", &encrypt },
@@ -23,7 +63,6 @@ struct fun_desc menu[] = {
 int main(int argc, char **argv) {
     
     char input[MAX_INPUT_LENGTH];
-    
     char* carray = malloc(CARRAY_SIZE * sizeof(char));
     carray[0] = '\0';
     int menu_size = 0;
@@ -32,23 +71,21 @@ int main(int argc, char **argv) {
     do {
         fprintf(stdout, "Please choose a function (ctrl^D for exit):\n");
         for (int i = 0; i < menu_size; i++)
-            fprintf(stdout, "%d) %s\n", i, menu[i].name);
-        fprintf(stdout, "\t");
-        
-        fflush(stdin);
-        fgets(input, MAX_INPUT_LENGTH, stdin);
-        if (feof(stdin)) break;
-        printf("%s\n", input);
+            fprintf(stdout, "%d) %s\n", i + 1, menu[i].name);
+        fprintf(stdout, "Choice: ");
+        if (fgets(input, MAX_INPUT_LENGTH, stdin) == NULL) break;
         int choice = atoi(input);
-        if (choice < 0 || choice >= menu_size) {
+        if (choice < 1 || choice > menu_size) {
             fprintf(stdout, "Not within bounds\n");
             break;
         }
         fprintf(stdout, "Within bounds\n");
-        char* eval = map(carray, CARRAY_SIZE, menu[choice].fun);
+        char* eval = map(carray, CARRAY_SIZE, menu[choice - 1].fun);
         free(carray);
         carray = eval;
         fprintf(stdout, "Current string:\t%s\n", carray);
     }
-    while (!feof(stdin));
+    while (1);
+    free(carray);
+    exit(0);
 }

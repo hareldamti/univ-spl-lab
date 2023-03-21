@@ -66,12 +66,14 @@ int main(int argc, char **argv)
     char carray2[] = {'a','b','c'};
     int* iarray2Ptr;
     char* carray2Ptr; 
+    int* p;
     /* task 1 d here */
     iarray2Ptr = iarray2;
     carray2Ptr = carray2;
-    printf("iarray2: [%d, %d, %d]\n", *iarray2, *(iarray2+1), *(iarray2+2));
-    printf("carray2: [%c, %c, %c]\n", *carray2, *(carray2+1), *(carray2+2));
+    printf("iarray2: [%d, %d, %d]\n", *iarray2Ptr, *(iarray2Ptr+1), *(iarray2Ptr+2));
+    printf("carray2: [%c, %c, %c]\n", *carray2Ptr, *(carray2Ptr+1), *(carray2Ptr+2));
     printf("Command line arg addresses (T1e):\n");
+    printf("p: %d\n", p);
     /* task 1 e here */
     for (int i = 1; i < argc; i++) 
         printf("\taddr: %p\tvalue: %s\n", argv[i], argv[i]);

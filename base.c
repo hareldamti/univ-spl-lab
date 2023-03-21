@@ -11,25 +11,24 @@ int main(int argc, char **argv){
     printf("my_get: \n");
     char* mapped = map(argv[1], l, &my_get);
     printf("Returned string: %s\n\n", mapped); // Without null termination.. how?
-    free(mapped);
+
 
     printf("cprt: \n");
-    mapped = map(argv[1], l, &cprt);
+    mapped = map(mapped, l, &cprt);
     printf("Returned string: %s\n\n", mapped); // Without null termination.. how?
-    free(mapped);
+
 
     printf("encrypt: \n");
-    mapped = map(argv[1], l, &encrypt);
+    mapped = map(mapped, l, &encrypt);
     printf("Returned string: %s\n\n", mapped); // Without null termination.. how?
-    free(mapped);
 
     printf("decrypt: \n");
-    mapped = map(argv[1], l, &decrypt);
+    mapped = map(mapped, l, &decrypt);
     printf("Returned string: %s\n\n", mapped); // Without null termination.. how?
-    free(mapped);
+
 
     printf("xprt: \n");
-    mapped = map(argv[1], l, &xprt);
+    mapped = map(mapped, l, &xprt);
     printf("Returned string: %s\n\n", mapped); // Without null termination.. how?
     free(mapped);
   }

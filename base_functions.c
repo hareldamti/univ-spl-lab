@@ -22,17 +22,17 @@ char cprt(char c){
   return c;
 }
 
-/* Gets a char c and returns its encrypted form by adding 1 to its value.
+/* Gets a char c and returns its encrypted form by adding 2 to its value.
    If c is not between 0x20 and 0x7E it is returned unchanged */
 char encrypt(char c) {
-  if (0x20 <= c && c <= 0x7E) return c + 1;
+  if (0x20 <= c && c <= 0x7E) return c + 2;
   return c;
 }
 
-/* Gets a char c and returns its decrypted form by reducing 1 from its value.
+/* Gets a char c and returns its decrypted form by reducing 2 from its value.
    If c is not between 0x20 and 0x7E it is returned unchanged */
 char decrypt(char c) {
-  if (0x20 <= c && c <= 0x7E) return c - 1;
+  if (0x20 <= c && c <= 0x7E) return c - 2;
   return c;
 }
 
