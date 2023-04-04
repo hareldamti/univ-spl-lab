@@ -14,6 +14,7 @@ void foo1();
 char g = 'g';
 void foo2();
 
+
 int main(int argc, char **argv)
 { 
     int addr2;
