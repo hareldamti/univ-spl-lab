@@ -1,7 +1,7 @@
 all:
-	clear myshell
+	clean myshell
 
-clear:
+clean:
 	rm -f *.o myshell
 
 myshell: myshell.c
