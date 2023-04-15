@@ -32,7 +32,22 @@ void printVirus(virus* virus, FILE* output) {
     fprintf(output, "%x\n\n", virus->sig[i]);
 }
 
-void detectVirus(char *buffer, unsigned int size, link* virus_list) {
+void detect_virus(char *buffer, unsigned int size, link *virus_list) {
+    for (int i = 0; i < size; i++) {
+        link* curr = virus_list;
+        while (curr != NULL) {
+            if (curr->vir->SigSize <= size - i &&
+                memcmp(buffer + i,curr->vir->sig, curr->vir->SigSize) == 0) {
+                printf("--Virus detected--\n\tstart:\t%d\n\tname:\t%s\n\tsize:%d\n",
+                i, curr->vir->virusName, curr->vir->SigSize);
+            }
+            curr = curr->nextVirus;
+        }
+    }
+}
+
+void neutralize_virus(char *fileName, int signatureOffset) {
+
 }
 
 void list_print(link* virus_list, FILE* output) {
@@ -57,7 +72,7 @@ link* list_append(link* virus_list, virus* data) {
 }
 
 void list_free(link* virus_list) {
-    link* curr = virus_list, *next;
+    link *curr = virus_list, *next;
     while (curr != NULL) {
         next = curr->nextVirus;
         free(curr->vir->sig);
@@ -72,8 +87,9 @@ void list_free(link* virus_list) {
 const short MAX_INPUT_LENGTH = 30; //'load signatures' dependency
 static link* virus_list;
 static short prior_input = 0;
-static char* suspected_file;
+static char* sus_file_name;
 static char sus_file_data[10000]; 
+static int sus_file_size;
 
 ///// MENU COMPONENTS /////
 void load_signatures() {
@@ -99,13 +115,27 @@ void print_signatures() {
 }
 
 void detect_viruses() {
-    FILE * fp = fopen(suspected_file, "r");
+    FILE * fp = fopen(sus_file_name, "r");
     fread(sus_file_data, sizeof(char), 10000, fp);
-
+    sus_file_size = ftell(fp);
+    detect_virus(sus_file_data, sus_file_size, virus_list);
+    fclose(fp);
 }
 
 void fix_file() {
-    
+    FILE * fp = fopen(sus_file_name, "r+");
+    for (int i = 0; i < sus_file_size; i++) {
+        link* curr = virus_list;
+        while (curr != NULL) {
+            if (curr->vir->SigSize <= sus_file_size - i &&
+                memcmp(sus_file_data + i,curr->vir->sig, curr->vir->SigSize) == 0) {
+                fseek(fp, i, SEEK_SET);
+                fwrite("\xC3", sizeof(char), 1, fp);
+            }
+            curr = curr->nextVirus;
+        }
+    }
+    fclose(fp);
 }
 
 void quit() {list_free(virus_list); exit(0);}
@@ -130,7 +160,7 @@ int main(int argc, char** argv) {
         printf("Reopen: ./virusDetector <filename>");
         exit(0);
     }
-    suspected_file = argv[1];
+    sus_file_name = argv[1];
 
     int menu_size = 0;
     char input[MAX_INPUT_LENGTH];
@@ -152,5 +182,4 @@ int main(int argc, char** argv) {
             (*(menu[choice - 1].fun))();
         }
     }
-    
 }
