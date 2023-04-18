@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <signal.h>
 #include "LineParser.h"
+#include <sys/wait.h>
+#include <sys/types.h>
 
 static bool debugMode = false;
 
@@ -41,15 +43,20 @@ void execute(cmdLine *pCmdLine) {
     }
     
     if (!pid) {
+        int r = -1, w = -1;
         if (pCmdLine->inputRedirect) {
             close(0);
-            dup(open(pCmdLine->inputRedirect, O_RDONLY));
+            r = open(pCmdLine->inputRedirect, O_RDONLY);
+            dup(r);
         }
         if (pCmdLine->outputRedirect) {
             close(1);
-            dup(open(pCmdLine->outputRedirect, O_WRONLY));
+            w = open(pCmdLine->outputRedirect, O_CREAT | O_WRONLY, 0777);
+            dup(w);
         }
         execvp(pCmdLine->arguments[0], pCmdLine->arguments);
+        if (r != -1) close(r);
+        if (w != -1) close(w);
         _exit(1);
     }
 
@@ -62,7 +69,7 @@ void execute(cmdLine *pCmdLine) {
         if (WEXITSTATUS(wstatus) != 0){
             perror(NULL);
             exit(1);
-        } 
+        }
     }
 }
 
@@ -78,6 +85,7 @@ int main(int argc, char** argv) {
         fprintf(stdout, "%s> ",path);
         fgets(input, 1 << 11, stdin);
         if (memcmp(input, "quit", 4) == 0) break;
+        freeCmdLines(pCmdLine);
         pCmdLine = parseCmdLines(input);
         execute(pCmdLine);
     }
