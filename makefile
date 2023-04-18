@@ -5,8 +5,8 @@ clean:
 
 myshell: myshell.c
 	gcc -g -m32 -c -o myshell.o myshell.c
-	gcc -g -m32 -c -o lineParser.o lineParser.c
-	gcc -g -m32 -o myshell myshell.o lineParser.o
+	gcc -g -m32 -c -o LineParser.o LineParser.c
+	gcc -g -m32 -o myshell myshell.o LineParser.o
 
 looper: looper.c
 	gcc -g -m32 -c -o looper.o looper.c
