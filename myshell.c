@@ -79,13 +79,13 @@ int main(int argc, char** argv) {
     
     char path[PATH_MAX];
     char input[1 << 11];
-    cmdLine* pCmdLine;
+    cmdLine* pCmdLine = NULL;
     while(1) {
         getcwd(path, PATH_MAX);
         fprintf(stdout, "%s> ",path);
         fgets(input, 1 << 11, stdin);
         if (memcmp(input, "quit", 4) == 0) break;
-        freeCmdLines(pCmdLine);
+        if (pCmdLine != NULL) freeCmdLines(pCmdLine);
         pCmdLine = parseCmdLines(input);
         execute(pCmdLine);
     }
