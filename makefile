@@ -1,17 +1,13 @@
-all: clean myshell looper mypipe
+all: clean myshell mypipeline
 
 clean:
-	rm -f *.o myshell looper mypipe
+	rm -f *.o myshell mypipeline
 
 myshell: myshell.c
 	gcc -g -m32 -c -o myshell.o myshell.c
 	gcc -g -m32 -c -o LineParser.o LineParser.c
 	gcc -g -m32 -o myshell myshell.o LineParser.o
 
-looper: looper.c
-	gcc -g -m32 -c -o looper.o looper.c
-	gcc -g -m32 -o looper looper.o
-
-mypipe: mypipe.c
-	gcc -g -m32 -c -o mypipe.o mypipe.c
-	gcc -g -m32 -o mypipe mypipe.o
+mypipeline: mypipeline.c
+	gcc -g -m32 -c -o mypipeline.o mypipeline.c
+	gcc -g -m32 -o mypipeline mypipeline.o
