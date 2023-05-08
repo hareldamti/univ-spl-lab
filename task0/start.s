@@ -2,6 +2,7 @@ section .text
 global _start
 global system_call
 extern main
+
 _start:
     pop    dword ecx    ; ecx = argc
     mov    esi,esp      ; esi = argv

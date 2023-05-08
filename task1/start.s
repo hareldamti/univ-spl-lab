@@ -16,24 +16,19 @@
     S_IRUSR             EQU 00400
     S_IWUSR             EQU 00200
 
-
 section .data
     msg db "Hello World",10,0
-    debug1 db "after for",10,0
-    debug2 db "in for",10,0
-    debug3 db "Hello World",10,0
-    space :         db  10
-    input :        dd  0
-    infile :        dd  STDIN
-    outfile :       dd  STDOUT
-
-
+    space :      db ' '
+    newline :    db 10
+    input :      dd 0
+    infile :     dd STDIN
+    outfile :    dd STDOUT
 
 section .text
-global _start
-global system_call
-extern strlen
-extern main
+    global _start
+    global system_call
+    extern strlen
+    extern main
 
 _start:
     call    main        ; int main( int argc, char *argv[], char *envp[] )
@@ -61,14 +56,10 @@ system_call:
     pop     ebp             ; Restore caller state
     ret                     ; Back to caller
 
-
-
 main:
     mov     esi,[esp+4]      ;argc
-    mov     edi,[esp+8]      ; argv pointer
+    mov     edi,[esp+8]      ;argv pointer
     
-
-
 loop:   cmp     esi, 0
         jz      done
         dec     esi
@@ -87,21 +78,27 @@ loop:   cmp     esi, 0
         mov     eax , WRITE 
         mov     ebx , STDOUT
         mov     ecx , edi ; pointer to next string
-        int     0x80            ; Transfer control to operating system 
+        int     0x80 
         add     edi, eax ; adds the length of the arg to edi
         inc     edi 
    
         ; print space
-        mov     edx, 1 ; length of the ' '
+        mov     edx, 1
         mov     eax , WRITE 
         mov     ebx , STDOUT
-        mov     ecx , space ; pointer to ' '
-        int     0x80            ; Transfer control to operating system    
+        mov     ecx , space
+        int     0x80 
         jmp     loop
         
 done:
+    ;; print newline
+    mov     edx, 1
+    mov     eax , WRITE 
+    mov     ebx , STDOUT
+    mov     ecx , newline
+    int     0x80 
 
-        call encoder
+    call encoder
     ret                     ; Back to caller
     
 encoder:
@@ -140,6 +137,7 @@ AtoZCheck:
     ZtoA:   mov     esi , 0x41
             mov     &input ,esi
     skip_1:   ret
+
 atozCheck:
             cmp     esi , 0x7A 
             jg      skip_2 ; jump if esi>'z'
@@ -172,17 +170,17 @@ change_output:
             mov     edx , S_IRUSR
             or      edx , S_IWUSR
             int     0x80  
-            mov     [outfile] , eax 
+            mov     [outfile], eax 
             ret         
 
 change_input:
             mov     eax , OPEN 
             mov     ebx , edi
             add     ebx , 2
-            mov     ecx , O_RDRW  ; 
+            mov     ecx , O_RDONLY; 
             mov     edx , S_IRUSR
             or      edx , S_IWUSR
             int     0x80  
-            mov     [infile] , eax 
+            mov     [infile], eax
             ret         
         

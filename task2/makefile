@@ -1,18 +1,17 @@
-all : main
+all: clean compile link
 
-main : main.o start.o
-		ld -m elf_i386 start.o main.o -o main
-start.o : start.s
-		nasm -f elf32 start.s -o start.o
-main.o : main.c
-		gcc -m32 -Wall -ansi -c -nostdlib -fno-stack-protector main.c -o main.o
+clean:
+	rm -f *.o task2
 
-clean :
-		rm -f main.o start.o main
+compile:
+	nasm -f elf32 start.s -o start.o
+	gcc -m32 -Wall -ansi -c -nostdlib -fno-stack-protector util.c -o util.o
+	gcc -m32 -Wall -ansi -c -nostdlib -fno-stack-protector main.c -o main.o
+	
 
-test : test.o
-		ld -m elf_i386 test.o -o test
-test.o : test.s
-		nasm -f elf32 test.s -o test.o
-clean_test : 
-		rm -f test.o test
+link:
+	ld -m elf_i386 start.o main.o util.o -o task2
+
+gcc: clean
+	gcc -m32 -Wall -ansi -c main.c -o main.o
+	gcc -m32 -Wall -ansi -c main.o -o main

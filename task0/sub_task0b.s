@@ -1,6 +1,4 @@
-
 ;Defines
-
     WRITE               EQU 4
     EXIT                EQU 1
     STDOUT              EQU 1
