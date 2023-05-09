@@ -76,7 +76,7 @@ loop:   cmp     esi, 0
 
         mov     edx, eax ; length of the arg
         mov     eax , WRITE 
-        mov     ebx , STDOUT
+        mov     ebx , STDERR
         mov     ecx , edi ; pointer to next string
         int     0x80 
         add     edi, eax ; adds the length of the arg to edi
@@ -85,7 +85,7 @@ loop:   cmp     esi, 0
         ; print space
         mov     edx, 1
         mov     eax , WRITE 
-        mov     ebx , STDOUT
+        mov     ebx , STDERR
         mov     ecx , space
         int     0x80 
         jmp     loop
@@ -94,7 +94,7 @@ done:
     ;; print newline
     mov     edx, 1
     mov     eax , WRITE 
-    mov     ebx , STDOUT
+    mov     ebx , STDERR
     mov     ecx , newline
     int     0x80 
 
@@ -114,46 +114,26 @@ encoder:
         jz      end_enc
         mov     esi ,&input    ; put the value read in esi
         call    AtoZCheck
-        call    atozCheck
         mov     edx, 1 ; length of the ' '
         mov     eax , WRITE 
         mov     ebx , &outfile
         mov     ecx , input  ; pointer to ' '
         int     0x80            
         jmp     enc_loop
-end_enc:
+    end_enc:
         ret
 
 AtoZCheck:
-            cmp     esi , 0x5A 
-            jg      skip_1 ; jump if esi>'Z'
+            cmp     esi , 0x7A
+            jg      skip_1 ; jump if esi>'z'
             cmp     esi , 0x41
             jl      skip_1 ; jump if esi<'A'
-            cmp     esi , 0x5A
-            jz      ZtoA ; jump if esi='Z'
             inc     esi             ; add 1 to the value
             mov     &input ,esi    ; store the value back in input
-            jmp     skip_1
-    ZtoA:   mov     esi , 0x41
-            mov     &input ,esi
-    skip_1:   ret
-
-atozCheck:
-            cmp     esi , 0x7A 
-            jg      skip_2 ; jump if esi>'z'
-            cmp     esi , 0x61
-            jl      skip_2 ; jump if esi<'a'
-            cmp     esi , 0x7A
-            jz      ztoa ; jump if esi='z'
-            inc     esi             ; add 1 to the value
-            mov     &input ,esi    ; store the value back in input
-            jmp     skip_2
-    ztoa:   mov     esi , 0x61
-            mov     &input ,esi
-    skip_2: ret
+            skip_1:
+            ret
 
 change_IO: 
-
             mov    edi , [esp+4]              ; the argument   
             cmp    word [edi], '-'+(256*'i')  ; equivalently "-i"
             jz     change_input

@@ -1,7 +1,0 @@
-
-
-stack: ------
-[return address] 
-[argv]
-[argc]
--- sp
