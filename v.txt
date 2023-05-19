@@ -1,0 +1,461 @@
+;to_remember : AND op activates parity.     PF is '1' if even number of bits are set.
+
+;Defines
+    EXIT                EQU 1
+    MAX_TO_READ         EQU 600
+    ASCII_0             EQU 48
+    ASCII_9             EQU 57
+    ASCII_a             EQU 97
+    ASCII_a_minus_10    EQU 87
+    ASCII_f             EQU 102
+    ASCII_dash          EQU 0x2d
+    ASCII_R             EQU 82
+    ASCII_I             EQU 73
+    SEED                EQU 0x4b2c                   ;Value asked in the forum
+    Fibonacci_MASK      EQU 0xb400
+    Byte_Size           EQU 8
+    msb                 EQU 0x8000
+
+section .rodata
+    Error_input      : db     "You entered an illegal char to hexadecimal format" , 10 , 0
+    printing_input   : db     "printing input %d" , 10 , 0
+    printing_multi   : db     "printing multi %x" , 10 , 0
+    Debug_msg        : db     "Debug value is:%d" , 10 , 0
+    Error_args       : db     "You entered an illegal args" , 10 , 0
+
+
+section .data
+    struc   multi 
+        m_size  : resb   1 
+        m_num   : resb   m_size
+    endstruc
+
+    counter     : db      0
+    printChar   : db      "%02hhx" , 0
+    printEnter  : db      10 , 0
+    for_debug   : dd      0
+    lfsr        : dw      SEED
+
+    x_struct    : istruc  multi
+                    at m_size , db      5
+                    at m_num  , db      0xaa , 1 , 2 , 0x44 , 0x4f    
+    
+    y_struct    : istruc  multi
+                    at m_size , db      6
+                    at m_num  , db      0xaa , 1 , 2 , 3 , 0x44 , 0x4f  
+
+section .bss
+    my_multi    : istruc  multi
+                    at m_size,  resb 1
+                    at m_num ,  resb 600
+
+    my_multi1    : istruc  multi
+                    at m_size,  resb 1
+                    at m_num ,  resb 600
+
+    my_multi2    : istruc  multi
+                    at m_size,  resb 1
+                    at m_num ,  resb 600
+
+    input       : resb    600
+
+    sum_pointer : resd    1
+
+section .text
+extern printf
+extern puts
+extern fgets
+extern stdin
+extern malloc
+global main
+
+main:
+    push    ebp
+    mov     ebp , esp
+    pushad
+
+    mov     ebx , [ebp + 8]     ;Argc
+    mov     eax , [ebp + 12]    ;Argv
+
+    cmp     ebx , 1
+    jz      no_argv_case
+
+    cmp     ebx , 2
+    jnz     error_args_case
+
+    add     eax , 4             ;eax - points to the second Argv
+    mov     ebx , [eax]         
+
+    mov     ecx , [ebx]         ;ecx = first char (needs to be '-')
+    cmp     byte cl , ASCII_dash
+    jnz     error_args_case
+
+    mov     ecx , [ebx+2]         ;ecx = third char (needs to be '\0')
+    cmp     byte cl , 0
+    jnz     error_args_case
+
+    mov     ecx , [ebx+1]         ;ecx = second char (needs to be 'I' or 'R')
+    cmp     byte cl , ASCII_I
+    jz      case_input
+
+    mov     ecx , [ebx+1]         ;ecx = second char (needs to be 'I' or 'R')
+    cmp     byte cl , ASCII_R
+    jz      case_random
+
+    jmp     error_args_case
+
+
+end_all:
+    push    dword [sum_pointer]
+    call    print_multi
+    add     esp , 4
+
+    popad
+    pop     ebp
+    ret
+    
+error_args_case:
+    push    Error_args
+    call    printf
+    add     esp , 4
+    mov     eax , EXIT
+    mov     ebx , 1
+    int     0x80
+    nop
+
+no_argv_case:
+    push    x_struct           
+    call    print_multi
+    add     esp , 4
+    push    y_struct
+    call    print_multi
+    add     esp , 4
+    push    x_struct
+    push    y_struct
+    call    add_multi
+    add     esp , 8
+    mov     dword [sum_pointer] , eax
+    jmp end_all
+
+case_random:
+    push    my_multi1
+    call    PRmulti
+    add     esp , 4
+    push    my_multi2
+    call    PRmulti
+    add     esp , 4
+    push    my_multi1
+    call    print_multi
+    add     esp , 4
+    push    my_multi2
+    call    print_multi
+    add     esp , 4
+    push    my_multi1
+    push    my_multi2
+    call    add_multi
+    add     esp , 8
+    mov     dword [sum_pointer] , eax
+    jmp end_all
+
+case_input:
+    push    my_multi1
+    call    getmulti
+    add     esp , 4
+    push    my_multi2
+    call    getmulti
+    add     esp , 4
+    push    my_multi1
+    call    print_multi
+    add     esp , 4
+    push    my_multi2
+    call    print_multi
+    add     esp , 4
+    push    my_multi1
+    push    my_multi2
+    call    add_multi
+    add     esp , 8
+    mov     dword [sum_pointer] , eax
+    jmp end_all
+
+print_multi:
+    push    ebp
+    mov     ebp , esp
+    pushad
+    mov     eax , [ebp + 8]
+    mov     byte cl , [eax]
+    mov     byte [counter] , cl
+
+    loop:
+        cmp     byte [counter] , 0
+        jz      endloop
+        xor     ebx , ebx
+        mov     byte bl , [counter]
+        push    eax
+        add     eax , ebx
+        push    dword [eax]
+        push    printChar
+        call    printf 
+        add     esp , 8
+        pop     eax
+        sub     byte [counter] , 1 
+        jmp     loop
+    endloop:
+        push    printEnter
+        call    printf
+        add     esp , 4
+    popad
+    pop     ebp
+    ret
+
+
+getmulti:
+    push    ebp
+    mov     ebp , esp
+    pushad
+    push    dword [stdin]
+    push    MAX_TO_READ
+    push    dword input
+    call    fgets
+    add     esp , 12
+    xor     eax , eax
+    jmp     correct_input
+end_correct:
+    mov     edx , [ebp + 8]
+    shr     al , 1
+    mov     byte [edx] , al
+    jmp     mov_input_multi
+multi_ready:
+    popad
+    pop     ebp
+    ret
+
+check_eve_odd:
+    mov     ebx , 1
+    and     ebx , eax
+    cmp     ebx , 1
+    jz      input_odd
+end_input_odd:
+    jmp     end_correct
+
+input_odd:
+    mov     ebx , eax
+loop_odd:
+    mov     byte cl , [input + ebx]
+    mov     byte [input + ebx + 1] , cl
+    cmp     ebx , 0
+    jz      add_zero_input
+    dec     ebx
+    jmp     loop_odd
+add_zero_input:
+    mov     byte [input] , 0
+    inc     eax
+    jmp     end_correct
+
+
+
+correct_input:
+    mov     byte bl , [input + eax]
+    cmp     byte bl , 10
+    jz      check_eve_odd
+    jmp     char_cases
+char_fixed:
+    mov     byte [input + eax] , bl
+    inc     al
+    jmp     correct_input          
+
+char_cases:
+    cmp     byte bl , ASCII_0
+    jl      illegal_char
+    cmp     byte bl , ASCII_9
+    jle     case_number
+    cmp     byte bl , ASCII_a
+    jl      illegal_char 
+    cmp     byte bl , ASCII_f
+    jle     case_letter
+    jmp     illegal_char            
+
+case_number:
+    sub     bl , ASCII_0
+    jmp     char_fixed
+
+case_letter:
+    sub     bl , ASCII_a_minus_10
+    jmp     char_fixed
+    
+illegal_char:
+    push    Error_input
+    call    printf
+    add     esp , 4
+    mov     eax , EXIT
+    mov     ebx , 1
+    int     0x80
+    nop
+
+mov_input_multi:
+    xor     eax , eax
+    xor     ebx , ebx 
+    mov     byte al , [edx]
+    mov     bl , 0
+mov_input_multi_loop:
+    cmp     byte al , 0
+    jz      multi_ready
+    mov     byte cl , [input + ebx]
+    shl     cl , 4
+    add     byte cl , [input + ebx +1]
+    mov     byte [edx + eax] , cl
+    inc     bl
+    inc     bl
+    dec     al
+    jmp     mov_input_multi_loop
+
+
+MaxMin:
+    mov     byte cl , [eax]
+    mov     byte dl , [ebx]
+    cmp     cl , dl
+    jl      swap
+    ret
+swap:  
+    mov     ecx , ebx
+    mov     ebx , eax  
+    mov     eax , ecx
+    ret
+
+
+add_multi:
+    push    ebp                                 ;generic
+    mov     ebp , esp                           ;generic
+    sub     esp , 4                             ;reserve local *int 
+    mov     eax , [ebp + 8]                     ;get first elemente
+    mov     ebx , [ebp + 12]                    ;get second element
+    call    MaxMin                              ;swap if needed
+    xor     ecx , ecx                               
+    mov     byte cl , [eax]                     ;clear and mov the size of the large number
+    inc     ecx                                 ;increase to leave room for size field
+    pushad
+    push    ecx                                 
+    call    malloc                              ;allocate
+    add     esp , 4                             
+    mov     [ebp - 4] , eax                     ;assign the return value to the local variable
+    popad
+    mov     edi , [ebp - 4]                     ;ecx = pointer
+    jmp     digitSum
+end_sum:
+    mov     eax , edi
+    add     esp , 4                             ;clear local variable
+    pop     ebp                                 ;generic
+    ret                                         ;generic
+
+
+digitSum:
+    xor     ecx , ecx
+    mov     byte cl , [eax]
+    mov     byte [edi] , cl
+    xor     ecx , ecx
+    xor     esi , esi
+    xor     edx , edx
+loopSum1:
+    cmp     byte cl , [ebx]
+    jz      loopSum2
+    mov     edx , esi
+    xor     esi , esi
+    add     byte dl , [eax + ecx +1]
+    jc      keepCarry1                           
+end_Carry1: 
+    add     byte dl , [ebx + ecx + 1]
+    jc      keepCarry2                           
+end_Carry2:
+    mov     byte [edi + ecx + 1] , dl
+    inc     cl
+    jmp     loopSum1
+loopSum2:
+    cmp     byte cl , [eax]
+    jz      end_sum
+    mov     edx , esi
+    xor     esi , esi
+    add     byte dl , [eax + ecx +1]
+    jc      keepCarry3        
+end_Carry3:
+    mov     byte [edi + ecx + 1] , dl
+    inc     cl
+    jmp     loopSum2
+
+
+keepCarry1:
+    inc     esi
+    jmp     end_Carry1
+keepCarry2:
+    inc     esi
+    jmp     end_Carry2
+keepCarry3:
+    inc     esi
+    jmp     end_Carry3
+
+
+rand_num:
+    push    ebp
+    mov     ebp , esp
+    sub     esp , 4
+    pushad
+
+
+    xor     eax , eax
+    mov     word ax , [lfsr]
+    mov     edx , Byte_Size
+    xor     ebx , ebx
+    xor     ecx , ecx
+rand_num_loop:
+    cmp     edx , 0
+    jz      enp_rand_num_loop
+    mov     cx , Fibonacci_MASK
+    and     cx , ax
+    popcnt  cx, cx
+    test    cx, 1
+    jz      even_number_of_bits_case
+    shl     bx , 1
+    mov     cx , 1
+    and     cx , ax
+    shr     ax , 1
+    add     ebx , ecx
+    or      eax , msb     
+    inc     ebx
+return_to_rand_num_loop:
+    dec     edx
+    jmp     rand_num_loop
+enp_rand_num_loop:
+    mov     [lfsr] , eax
+    mov     [ebp - 4] , ebx
+    popad
+    mov     eax , [ebp - 4]
+    add     esp , 4
+    pop     ebp
+    ret
+
+even_number_of_bits_case:
+    mov     cx , 1
+    and     cx , ax
+    shr     ax , 1
+    add     ebx , ecx
+    jmp     return_to_rand_num_loop
+
+PRmulti:
+    push    ebp
+    mov     ebp , esp
+    pushad
+    mov     ebx , [ebp + 8]
+    call    rand_num
+    mov     byte [ebx] , al
+    mov     ecx , eax
+
+PRmulti_loop:
+    cmp     ecx , 0
+    jz      end_PRmulti_loop
+    call    rand_num	
+    mov     byte [ebx + ecx] , al
+    dec     ecx
+    jmp     PRmulti_loop
+end_PRmulti_loop:
+    popad
+    pop     ebp
+    ret
+    ret 

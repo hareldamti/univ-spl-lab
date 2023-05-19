@@ -1,4 +1,4 @@
-name = task1
+name = task0
 
 all: clean compile link
 
@@ -6,7 +6,7 @@ clean:
 	rm -f *.o $(name)
 
 compile:
-	nasm -g -f elf32 start.s -o start.o
+	nasm -g -f elf32 $(name).s -o $(name).o
 
 link:
-	gcc -g -w -m32 start.o -o $(name) 
+	gcc -g -m32 $(name).o -o $(name) 
