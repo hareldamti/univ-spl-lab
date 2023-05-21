@@ -1,11 +1,12 @@
 ; DEFINES
-    SEED EQU 0x4d33
+    SEED            EQU 0x7733
+    NUMS_DEFAULT    EQU 0
+    NUMS_INPUT      EQU 1
+    NUMS_RANDOM     EQU 2
 
 section .data:
     argc_format db "argc: %d",10,0
     loop_multi_format db "%02hhx",0
-
-    address_format db "address: %x",10, 0
 
     x_struct: db 5
     x_num: db 0xaa, 1,2,0x44,0x4f
@@ -14,16 +15,18 @@ section .data:
 
     MASK dw 0xb400
 
+    
     linefeed: db 10,0
     
 section .bss
+   nums_mode resd 1
    input resb 600
    STATE resd 1
    
 
 section .text
 
-extern printf, exit, puts, strlen, stdin, fgets, strtol, malloc
+extern printf, exit, puts, strlen, stdin, fgets, strtol, malloc, free
 global main
 
 PRmulti:
@@ -31,33 +34,34 @@ PRmulti:
     mov ebp, esp
     sub esp, 8
 
-    call rand_num
-    and eax, 0xfe
-    inc eax
+    call rand_num                  ;; [ebp-4] = malloc(ebx)
     push eax
     call malloc
     pop ebx
     mov dword [ebp-4], eax
-    dec ebx
+    ;dec ebx
     mov byte [eax], bl
 
-    mov bh, 0
+    ;mov bh, 0
 
     loop_PRmulti:
+        cmp byte bh, bl
+        jge end_loop_PRmulti
+
         push ebx
         call rand_num
         pop ebx
 
-        mov ecx, 0
-        mov cl, bh
+        mov ecx, 1
+        add cl, bh
         add ecx, [ebp-4]
-        inc ecx
+        ;inc ecx
 
         mov byte [ecx], al
 
         inc bh
-        cmp byte bl, bh
-        jl loop_PRmulti
+        jmp loop_PRmulti
+    end_loop_PRmulti:
 
     mov eax, [ebp-4]
 
@@ -225,7 +229,9 @@ get_multi:
 
     push dword [stdin]
     push 600
-    push input
+    mov ebx, input
+    inc ebx
+    push ebx
     call fgets
     add esp, 12
     
@@ -235,16 +241,13 @@ get_multi:
     sub eax, 1
     mov ecx, eax
 
+    mov dword [ebp-4], 0
+    inc ecx
     and byte al, 0x01
     cmp byte al, 0
-    je asserted_even
+    jne asserted_even
 
-    mov ebx, input
-    add ebx, ecx
-    sub ebx, 1
-    inc ecx
-    mov byte al, [ebx]
-    mov byte [ebx+1], '0'
+    mov dword [ebp-4], 1
 
     asserted_even:
 
@@ -262,21 +265,22 @@ get_multi:
     mov byte [eax], cl
 
     mov ebx, 0
+
     loop_get_multi:
         cmp ebx, ecx
         jge end_loop_get_multi
         
-        mov esi, 0
+        mov esi, [ebp-4]
         mov edi, eax
         add edi, ecx
         sub edi, ebx
-
 
         call parse_hex 
         mov byte [edi], dl
         shl byte [edi], 4
 
-        mov esi, 1
+        mov esi, [ebp-4]
+        inc esi
         call parse_hex
         add byte [edi], dl
 
@@ -284,10 +288,6 @@ get_multi:
         jmp loop_get_multi
 
     end_loop_get_multi:
-    
-    ;;push eax
-    ;;call print_multi
-    ;;add esp, 4
 
     add esp, 4
     pop ebp
@@ -307,7 +307,7 @@ print_multi:
     dec ch
 
     loop_print_multi:
-        cmp byte ch, 0x00
+        cmp byte ch, 0
         jl end_print_multi
 
         push ecx
@@ -342,6 +342,95 @@ print_multi:
     pop ebp
     ret
 
+parse_mode:
+    push ebp
+    mov ebp, esp
+    sub esp, 4
+
+    call rand_num
+    
+    mov eax, [ebp+8]
+
+    cmp byte [eax], '-'
+    jne end_set_mode
+
+    inc eax
+    
+    cmp byte [eax], 'I'
+    je set_mode_input
+
+    cmp word [eax], 'R'
+    je set_mode_random
+    
+    mov dword [nums_mode], NUMS_DEFAULT
+    jmp end_set_mode
+
+    set_mode_input:
+    mov dword [nums_mode], NUMS_INPUT
+    jmp end_set_mode
+
+    set_mode_random:
+    mov dword [nums_mode], NUMS_RANDOM
+    jmp end_set_mode
+
+    end_set_mode:
+    add esp, 4
+    pop ebp
+    ret
+
+set_nums:
+    push ebp
+    mov ebp, esp
+    sub esp, 4
+
+    cmp dword [nums_mode], NUMS_DEFAULT
+    je set_nums_default
+
+    cmp dword [nums_mode], NUMS_INPUT
+    je set_nums_input
+
+    cmp dword [nums_mode], NUMS_RANDOM
+    je set_nums_random
+
+    set_nums_default:
+        mov dword [ebp+12], x_struct
+        push x_struct
+        call print_multi
+        mov dword [ebp+8], y_struct
+        push y_struct
+        call print_multi
+        add esp, 8
+        jmp end_set_nums
+
+    set_nums_input:
+        call get_multi
+        mov dword [ebp+12], eax
+        push eax
+        call print_multi
+        call get_multi
+        mov dword [ebp+8], eax
+        push eax
+        call print_multi
+        add esp, 8
+        jmp end_set_nums
+
+    set_nums_random:
+        call PRmulti
+        mov dword [ebp+12], eax
+        push eax
+        call print_multi
+        call PRmulti
+        mov dword [ebp+8], eax
+        push eax
+        call print_multi
+        add esp, 8
+        jmp end_set_nums
+
+    end_set_nums:
+    add esp, 4
+    pop ebp
+    ret
+
 main:
     push ebp
     mov ebp, esp
@@ -365,6 +454,7 @@ main:
         push ecx
 
         push dword edx
+        call parse_mode
         call puts
 
         pop edx             ; partial popad 
@@ -376,25 +466,23 @@ main:
         cmp ebx, ecx        ; while ( ebx < ecx )
         jl loop_args
 
-    call PRmulti
-    push eax
-    call print_multi
-    pop eax
-    push 0
-    call exit
 
-    call get_multi
-    push eax
-    call print_multi
-    call get_multi
-    push eax
-    call print_multi
-
+    sub esp, 8
+    call set_nums
     call add_multi
-    add esp, 8
     push eax
     call print_multi
-    pop eax
+    call free
+    add esp, 4
 
+    cmp dword [nums_mode], NUMS_DEFAULT
+    je end_main
+
+    call free
+    add esp, 4
+    call free
+    add esp, 4
+
+    end_main:
     push 0
     call exit
