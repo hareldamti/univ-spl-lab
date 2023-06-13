@@ -24,6 +24,9 @@ void print(Elf32_Phdr * phdr, int arg) {
 
 void phdr_table(Elf32_Phdr * phdr, int newline) {
     char flags[3] = {'R', 'W', 'E'};
+    int permissions = (phdr -> p_flags & 4) / 4
+                    | (phdr -> p_flags & 2)
+                    | (phdr -> p_flags & 1) * 4;
     for (int i = 0; i < 3; i++) if (!((phdr -> p_flags >> (2-i)) & 1)) flags[i] = ' ';
     printf("%-9d\t%x\t%x\t\t%x\t\t%x\t%x\t%s\t%x%s",
         phdr -> p_type,
@@ -36,6 +39,7 @@ void phdr_table(Elf32_Phdr * phdr, int newline) {
         phdr -> p_align,
         newline ? "\n" : ""
     );
+    printf("\t--Permissions flags: %d\n\t--Map flags: %d\n", permissions, MAP_PRIVATE);
     
 }
 
@@ -50,7 +54,7 @@ void load_phdr(Elf32_Phdr * phdr, int fd) {
               padding = phdr -> p_vaddr   & 0xfff;
 
     void* mapped = mmap( (void*)vaddr, phdr -> p_memsz + padding, permissions, MAP_PRIVATE | MAP_FIXED, fd, offset);
-    phdr_table(phdr, 0); printf("\t%x\n", (int)mapped);
+    phdr_table(phdr, 1);
 }
 
 int main(int argc, char ** argv) {
@@ -64,12 +68,13 @@ int main(int argc, char ** argv) {
     // foreach_phdr(map, print, 0);
 
     //////// task1:
-    //printf("Type\t\toffset\tVirtAddr\tPhysAddr\tFileSiz\tMemSiz\tFlg\tAlign\n");
-    //foreach_phdr(map, phdr_table, 1);
+    // printf("Type\t\toffset\tVirtAddr\tPhysAddr\tFileSiz\tMemSiz\tFlg\tAlign\n");
+    // foreach_phdr(map, phdr_table, 1);
 
     //////// task2:
     printf("Type\t\toffset\tVirtAddr\tPhysAddr\tFileSiz\tMemSiz\tFlg\tAlign\n");
     foreach_phdr(map, load_phdr, fd);
     startup(argc - 1, argv + 1, (void *)elf_hdr -> e_entry);
+
     close(fd);
 }

@@ -4,7 +4,7 @@ clean:
 	rm -f *.o loader
 
 compile:
-	gcc -m32 -c loader.c -o loader.o
+	gcc -m32 -c task2.c -o loader.o
 	nasm -g -f elf32 start.s -o start.o
 	nasm -g -f elf32 startup.s -o startup.o
 	
