@@ -5,6 +5,9 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 
+void startup(int argc, char ** argv, void (*start)());
+void close();
+
 int foreach_phdr(void *map_start, void (*func)(Elf32_Phdr *,int), int arg) {
     Elf32_Ehdr* elf_hdr = (Elf32_Ehdr*) map_start;
     for (int i = 0; i < elf_hdr -> e_phnum; i++) {
@@ -38,16 +41,16 @@ void phdr_table(Elf32_Phdr * phdr, int newline) {
 
 void load_phdr(Elf32_Phdr * phdr, int fd) {
     if (phdr -> p_type != 1) return;
-    int permissions = (phdr -> p_flags & 4)
-                    + (phdr -> p_flags & 2) * 2
-                    + (phdr -> p_flags & 1) * 4;
+    int permissions = (phdr -> p_flags & 4) / 4
+                    | (phdr -> p_flags & 2)
+                    | (phdr -> p_flags & 1) * 4;
     
     Elf32_Off vaddr   = phdr -> p_vaddr  & 0xfffff000,
               offset  = phdr -> p_offset & 0xfffff000,
               padding = phdr -> p_vaddr   & 0xfff;
 
     void* mapped = mmap( (void*)vaddr, phdr -> p_memsz + padding, permissions, MAP_PRIVATE | MAP_FIXED, fd, offset);
-    phdr_table(phdr, 0); printf("\t%x\n", mapped);
+    phdr_table(phdr, 0); printf("\t%x\n", (int)mapped);
 }
 
 int main(int argc, char ** argv) {
@@ -67,7 +70,6 @@ int main(int argc, char ** argv) {
     //////// task2:
     printf("Type\t\toffset\tVirtAddr\tPhysAddr\tFileSiz\tMemSiz\tFlg\tAlign\n");
     foreach_phdr(map, load_phdr, fd);
-    printf("starting at: %x\n", (void *)elf_hdr -> e_entry);
     startup(argc - 1, argv + 1, (void *)elf_hdr -> e_entry);
     close(fd);
 }
