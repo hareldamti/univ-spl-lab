@@ -1,13 +1,10 @@
-all: clean compile link
+all: clean linker
 
 clean:
-	rm -f *.o loader
+	rm -f *.o linker
 
-compile:
-	gcc -m32 -c loader.c -o loader.o
-	nasm -g -f elf32 start.s -o start.o
-	nasm -g -f elf32 startup.s -o startup.o
-	
+linker: linker.o
+	gcc -m32 -g -Wall -o linker linker.o
 
-link:
-	ld -o loader loader.o startup.o start.o -L/usr/lib32 -lc -T linking_script -dynamic-linker /lib32/ld-linux.so.2
+linker.o: linker.c
+	gcc -m32 -c -g -Wall -o linker.o linker.c
