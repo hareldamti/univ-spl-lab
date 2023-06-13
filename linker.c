@@ -194,7 +194,67 @@ void check_files_for_merge(state* s) {
 }
 
 void merge_elf_files(state* s) {
+    FILE* fp = fopen("out.ro" , "w+");
+    Elf32_Ehdr* elf_hdr[2];
+    Elf32_Shdr** shdr[2];
+    Elf32_Shdr* strtab[2];
+    Elf32_Shdr* symtab[2];
+    
+    char* shstrtab[2];
+    for (int idx = 0; idx < 2; idx++) {
+        elf_hdr[idx] = (Elf32_Ehdr*)s->map_start[idx];
+        shstrtab[idx] = s->map_start[idx] + elf_hdr[idx]->e_shoff + sizeof(Elf32_Shdr) * elf_hdr[idx]->e_shstrndx;
+        shdr[idx] = s->map_start[idx] + elf_hdr[idx]->e_shoff;
+        for (int i = 0; i < elf_hdr[idx]->e_shnum; i++) {
+            if (shdr[idx][i]->sh_type == SHT_SYMTAB) symtab[idx] = shdr[idx][i];
+            if (shdr[idx][i]->sh_type == SHT_STRTAB) strtab[idx] = shdr[idx][i];
+        }
+    }
 
+    for (int i = 1; i < symtab[0]->sh_size / symtab[0]->sh_entsize; i++) {
+        Elf32_Sym* sym1 = (Elf32_Sym*)(s->map_start[0] + symtab[0]->sh_addr + symtab[0]->sh_offset + i * sizeof(Elf32_Sym));
+        char* sym1_name = (char *)(s->map_start[0] + strtab[0]->sh_addr + strtab[0]->sh_offset + sym1->st_name);
+        if (sym1->st_shndx == 0) {
+            for (int j = 1; j < symtab[1]->sh_size / symtab[1]->sh_entsize; j++) {
+                Elf32_Sym* sym2 = (Elf32_Sym*)(s->map_start[1] + symtab[1]->sh_addr + symtab[1]->sh_offset + j * sizeof(Elf32_Sym));
+                char* sym2_name = (char *)(s->map_start[1] + strtab[1]->sh_addr + strtab[1]->sh_offset + sym2->st_name);
+                if (strcmp(sym1_name, sym2_name) == 0 && sym2->st_shndx != 0) {
+                    memcpy(sym1, sym2, sizeof(Elf32_Sym));
+                }
+            }
+        }
+    }
+    
+    char* concat_sh[3] = {".text", ".data", ".rodata"}; 
+    fseek(fp, sizeof(Elf32_Ehdr) + elf_hdr[0]->e_shnum * sizeof(Elf32_Shdr), SEEK_SET);
+    for (int i = 0; i < elf_hdr[0]->e_shnum; i++) {
+        unsigned int start = ftell(fp);
+        fwrite(s->map_start[0] + shdr[0][i]->sh_addr + shdr[0][i]->sh_offset, 1, shdr[0][i]->sh_size, fp);
+        for (int c = 0; c < 3; c++) {
+            if (strcmp(shstrtab[0] + shdr[0][i]->sh_name, concat_sh[c]) == 0) {
+                for (int j = 0; j < elf_hdr[1]->e_shnum; j++) {
+                    if (strcmp(shstrtab[1] + shdr[1][j]->sh_name, concat_sh[c]) == 0) {
+                        fwrite(s->map_start[1] + shdr[1][j]->sh_addr + shdr[1][j]->sh_offset, 1, shdr[1][j]->sh_size, fp);
+                    }
+                }
+            }
+        }
+        unsigned int end = ftell(fp);
+        shdr[0][i]->sh_addr = 0;
+        shdr[0][i]->sh_offset = start;
+        shdr[0][i]->sh_size = end - start;
+    }
+    
+    elf_hdr[0]->e_shoff    += sizeof(Elf32_Ehdr) - elf_hdr[0]->e_shoff;
+
+    fseek(fp, 0, SEEK_SET);
+    fwrite(elf_hdr[0], 1, sizeof(Elf32_Ehdr), fp);
+    fwrite(shdr[0], 1, elf_hdr[0]->e_shnum * sizeof(Elf32_Shdr), fp);
+    fclose(fp);
+    
+
+
+    
 }
 
 void quit(state* s) {
