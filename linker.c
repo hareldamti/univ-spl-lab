@@ -19,6 +19,7 @@ typedef struct {
   int current_fd;
   int fd[2];
   char filename[2][FILENAME_LENGTH];
+  long filesize[2];
   void* map_start[2];
   char quit_signal;
 } state;
@@ -29,9 +30,12 @@ void toggle_debug_mode(state* s) {
 }
 
 void examine_elf_file(state* s) {
-    if (s->fd[s->current_fd] != -1) close(s->fd[s->current_fd]); // Close previous file
+    if (s->fd[s->current_fd] != -1) {
+        close(s->fd[s->current_fd]); // Close previous file
+        munmap(s->map_start[s->current_fd], s->filesize[s->current_fd]);
+    }
     Elf32_Ehdr elf_hdr;
-    int newline, filesize;
+    int newline;
 
     printf("enter filename: ");
     fgets(s->filename[s->current_fd], FILENAME_LENGTH, stdin);
@@ -45,19 +49,19 @@ void examine_elf_file(state* s) {
         return;
     }
     fseek(fp, 0, SEEK_END);
-    filesize = ftell(fp);
+    s->filesize[s->current_fd] = ftell(fp);
     fclose(fp);
 
     
 
     s->fd[s->current_fd] = open(s->filename[s->current_fd], O_RDONLY);
-    s->map_start[s->current_fd] = mmap(0, filesize, PROT_READ, MAP_PRIVATE, s->fd[s->current_fd], 0);
+    s->map_start[s->current_fd] = mmap(0, s->filesize[s->current_fd], PROT_READ, MAP_PRIVATE, s->fd[s->current_fd], 0);
     elf_hdr = *(Elf32_Ehdr*)s->map_start[s->current_fd];
     
     printf("First 3 bytes of the magic number: %x %x %x\n", elf_hdr.e_ident[1], elf_hdr.e_ident[2], elf_hdr.e_ident[3]);
     if (memcmp(elf_hdr.e_ident+1, "ELF", 3) != 0) {
         printf("Examined file is not in ELF format!\n");
-        munmap(s->map_start[s->current_fd], filesize);
+        munmap(s->map_start[s->current_fd], s->filesize[s->current_fd]);
         close(s->fd[s->current_fd]);
         s->fd[s->current_fd] = -1;
         return;
@@ -195,64 +199,94 @@ void check_files_for_merge(state* s) {
 
 void merge_elf_files(state* s) {
     FILE* fp = fopen("out.ro" , "w+");
-    Elf32_Ehdr* elf_hdr[2];
-    Elf32_Shdr** shdr[2];
+    Elf32_Ehdr elf_hdr[2];
+    Elf32_Shdr* shdr[2];
     Elf32_Shdr* strtab[2];
     Elf32_Shdr* symtab[2];
-    
     char* shstrtab[2];
+
+    // Find symbol, string and section header tables,
     for (int idx = 0; idx < 2; idx++) {
-        elf_hdr[idx] = (Elf32_Ehdr*)s->map_start[idx];
-        shstrtab[idx] = s->map_start[idx] + elf_hdr[idx]->e_shoff + sizeof(Elf32_Shdr) * elf_hdr[idx]->e_shstrndx;
-        shdr[idx] = s->map_start[idx] + elf_hdr[idx]->e_shoff;
-        for (int i = 0; i < elf_hdr[idx]->e_shnum; i++) {
-            if (shdr[idx][i]->sh_type == SHT_SYMTAB) symtab[idx] = shdr[idx][i];
-            if (shdr[idx][i]->sh_type == SHT_STRTAB) strtab[idx] = shdr[idx][i];
+        memcpy(&elf_hdr[idx],s->map_start[idx],sizeof(Elf32_Ehdr));
+        Elf32_Shdr shstr_hdr = *(Elf32_Shdr *)(s->map_start[idx] + elf_hdr[idx].e_shoff + sizeof(Elf32_Shdr) * elf_hdr[idx].e_shstrndx);
+        shstrtab[idx] = s->map_start[idx] + shstr_hdr.sh_addr + shstr_hdr.sh_offset;
+
+        shdr[idx] = (Elf32_Shdr*)(s->map_start[idx] + elf_hdr[idx].e_shoff);
+        for (int i = 0; i < elf_hdr[idx].e_shnum; i++) {
+            if (shdr[idx][i].sh_type == SHT_SYMTAB) {symtab[idx] = &shdr[idx][i];}
+            if (shdr[idx][i].sh_type == SHT_STRTAB) {strtab[idx] = &shdr[idx][i];}
         }
     }
+    
+    // Create copies of the 1st section header table, and the symbol table.
+    Elf32_Shdr new_sh_tab[elf_hdr[0].e_shnum];
+    int n_symbols = symtab[0]->sh_size / symtab[0]->sh_entsize;
+    Elf32_Sym new_sym_tab[n_symbols];
+    memcpy(new_sh_tab, shdr[0], elf_hdr[0].e_shnum * sizeof(Elf32_Shdr));
+    memcpy(new_sym_tab, s->map_start[0] + symtab[0]->sh_addr + symtab[0]->sh_offset, n_symbols * sizeof(Elf32_Sym));
 
-    for (int i = 1; i < symtab[0]->sh_size / symtab[0]->sh_entsize; i++) {
-        Elf32_Sym* sym1 = (Elf32_Sym*)(s->map_start[0] + symtab[0]->sh_addr + symtab[0]->sh_offset + i * sizeof(Elf32_Sym));
+
+    // Update the copied symbol table with undef shndx with the 2nd file symbol table
+    for (int i = 1; i < n_symbols; i++) {
+        Elf32_Sym* sym1 = &new_sym_tab[i];
         char* sym1_name = (char *)(s->map_start[0] + strtab[0]->sh_addr + strtab[0]->sh_offset + sym1->st_name);
         if (sym1->st_shndx == 0) {
             for (int j = 1; j < symtab[1]->sh_size / symtab[1]->sh_entsize; j++) {
-                Elf32_Sym* sym2 = (Elf32_Sym*)(s->map_start[1] + symtab[1]->sh_addr + symtab[1]->sh_offset + j * sizeof(Elf32_Sym));
-                char* sym2_name = (char *)(s->map_start[1] + strtab[1]->sh_addr + strtab[1]->sh_offset + sym2->st_name);
-                if (strcmp(sym1_name, sym2_name) == 0 && sym2->st_shndx != 0) {
-                    memcpy(sym1, sym2, sizeof(Elf32_Sym));
+                Elf32_Sym sym2;
+                memcpy(&sym2, (Elf32_Sym*)(s->map_start[1] + symtab[1]->sh_addr + symtab[1]->sh_offset + j * sizeof(Elf32_Sym)), sizeof(Elf32_Sym));
+                char* sym2_name = (char *)(s->map_start[1] + strtab[1]->sh_addr + strtab[1]->sh_offset + sym2.st_name);
+                if (strcmp(sym1_name, sym2_name) == 0 && sym2.st_shndx != 0) {
+                    // find the appropriate section index in the first table for the name from the second table
+                    char* section_name = shstrtab[1] + shdr[1][sym2.st_shndx].sh_name;
+                    for (int k = 0; k < elf_hdr[0].e_shnum; k++) {
+                        if (strcmp(section_name, shstrtab[0] + shdr[0][k].sh_name) == 0) {
+                            sym1->st_shndx =  k;
+                            sym1->st_value += sym2.st_value;
+                            sym1->st_other =  sym2.st_other;
+                            sym1->st_size  =  sym2.st_size;
+                            sym1->st_info  =  sym2.st_info;
+                            break;
+                        }
+                    }
                 }
             }
         }
     }
     
+    // Write the sections' content into the file, concatenating the 2 files for the .text, .data, .rodata
     char* concat_sh[3] = {".text", ".data", ".rodata"}; 
-    fseek(fp, sizeof(Elf32_Ehdr) + elf_hdr[0]->e_shnum * sizeof(Elf32_Shdr), SEEK_SET);
-    for (int i = 0; i < elf_hdr[0]->e_shnum; i++) {
+    fseek(fp, sizeof(Elf32_Ehdr) + elf_hdr[0].e_shnum * sizeof(Elf32_Shdr), SEEK_SET);
+    for (int i = 0; i < elf_hdr[0].e_shnum; i++) {
         unsigned int start = ftell(fp);
-        fwrite(s->map_start[0] + shdr[0][i]->sh_addr + shdr[0][i]->sh_offset, 1, shdr[0][i]->sh_size, fp);
-        for (int c = 0; c < 3; c++) {
-            if (strcmp(shstrtab[0] + shdr[0][i]->sh_name, concat_sh[c]) == 0) {
-                for (int j = 0; j < elf_hdr[1]->e_shnum; j++) {
-                    if (strcmp(shstrtab[1] + shdr[1][j]->sh_name, concat_sh[c]) == 0) {
-                        fwrite(s->map_start[1] + shdr[1][j]->sh_addr + shdr[1][j]->sh_offset, 1, shdr[1][j]->sh_size, fp);
+        if (new_sh_tab[i].sh_type == SHT_SYMTAB) {
+            fwrite(&new_sym_tab, 1, new_sh_tab[i].sh_size, fp);
+        }
+        else {
+            fwrite(s->map_start[0] + shdr[0][i].sh_addr + shdr[0][i].sh_offset, 1, shdr[0][i].sh_size, fp);
+            for (int c = 0; c < 3; c++) {
+                if (strcmp(shstrtab[0] + shdr[0][i].sh_name, concat_sh[c]) == 0) {
+                    for (int j = 0; j < elf_hdr[1].e_shnum; j++) {
+                        if (strcmp(shstrtab[1] + shdr[1][j].sh_name, concat_sh[c]) == 0) {
+                            fwrite(s->map_start[1] + shdr[1][j].sh_addr + shdr[1][j].sh_offset, 1, shdr[1][j].sh_size, fp);
+                        }
                     }
                 }
             }
         }
         unsigned int end = ftell(fp);
-        shdr[0][i]->sh_addr = 0;
-        shdr[0][i]->sh_offset = start;
-        shdr[0][i]->sh_size = end - start;
+        new_sh_tab[i].sh_addr = 0;
+        new_sh_tab[i].sh_offset = start;
+        new_sh_tab[i].sh_size = end - start;
     }
     
-    elf_hdr[0]->e_shoff    += sizeof(Elf32_Ehdr) - elf_hdr[0]->e_shoff;
+    // Update section header offset
+    elf_hdr[0].e_shoff += sizeof(Elf32_Ehdr) - elf_hdr[0].e_shoff;
 
+    // Write the elf Header and section header table in the start of the file
     fseek(fp, 0, SEEK_SET);
-    fwrite(elf_hdr[0], 1, sizeof(Elf32_Ehdr), fp);
-    fwrite(shdr[0], 1, elf_hdr[0]->e_shnum * sizeof(Elf32_Shdr), fp);
+    fwrite(&elf_hdr[0], 1, sizeof(Elf32_Ehdr), fp);
+    fwrite(&new_sh_tab[0], 1, elf_hdr[0].e_shnum * sizeof(Elf32_Shdr), fp);
     fclose(fp);
-    
-
 
     
 }
@@ -307,6 +341,11 @@ int main(int argc, char **argv) {
         if (appState.quit_signal) break;
     }
     while(1);
-
+    for (int i = 0; i < 2; i++) {
+        if (appState.fd[i] != -1){
+            close(appState.fd[i]);
+            munmap(appState.map_start[i], appState.filesize[i]);
+        }
+    }
     exit(0);
 }
